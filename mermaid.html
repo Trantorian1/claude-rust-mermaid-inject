@@ -134,6 +134,19 @@
     });
   };
 
+  // Helper: Render a mermaid diagram into a wrapper element
+  const renderMermaidToWrapper = async (wrapper, mermaidText) => {
+    try {
+      const uniqueId = `mermaid-${Date.now()}`;
+      const { svg } = await mermaid.render(uniqueId, mermaidText);
+      wrapper.innerHTML = svg;
+      scaleSVG(wrapper.querySelector('svg'));
+    } catch (error) {
+      console.error('Failed to render mermaid diagram:', error);
+      wrapper.innerHTML = '<p style="color: red;">Failed to render diagram</p>';
+    }
+  };
+
   // Helper: Render diagram in fullscreen
   const renderFullscreen = async (mermaidText) => {
     const overlay = document.createElement('div');
@@ -177,15 +190,7 @@
     container.onclick = (e) => e.stopPropagation();
 
     // Render the diagram
-    try {
-      const uniqueId = `mermaid-${Date.now()}`;
-      const { svg } = await mermaid.render(uniqueId, mermaidText);
-      diagramWrapper.innerHTML = svg;
-      scaleSVG(diagramWrapper.querySelector('svg'));
-    } catch (error) {
-      console.error('Failed to render mermaid diagram:', error);
-      diagramWrapper.innerHTML = '<p style="color: red;">Failed to render diagram</p>';
-    }
+    await renderMermaidToWrapper(diagramWrapper, mermaidText);
   };
 
   // Re-render a diagram with stored text
@@ -213,8 +218,6 @@
 
     const originalText = diagram.textContent;
     processedDiagrams.set(diagram, originalText);
-    diagram.setAttribute('data-mermaid-original', originalText);
-
     await renderDiagram(diagram, originalText);
   };
 
@@ -237,23 +240,8 @@
     // Update fullscreen overlay if active
     if (activeOverlay) {
       const { container, diagramWrapper, mermaidText } = activeOverlay;
-
-      // Update container theme class
-      if (newTheme === 'dark') {
-        container.classList.add('dark');
-      } else {
-        container.classList.remove('dark');
-      }
-
-      // Re-render the fullscreen diagram
-      try {
-        const uniqueId = `mermaid-fullscreen-${Date.now()}`;
-        const { svg } = await mermaid.render(uniqueId, mermaidText);
-        diagramWrapper.innerHTML = svg;
-        scaleSVG(diagramWrapper.querySelector('svg'));
-      } catch (error) {
-        console.error('Failed to re-render fullscreen diagram:', error);
-      }
+      container.classList.toggle('dark', newTheme === 'dark');
+      await renderMermaidToWrapper(diagramWrapper, mermaidText);
     }
   };
 
