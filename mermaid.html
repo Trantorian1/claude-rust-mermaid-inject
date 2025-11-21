@@ -1,41 +1,41 @@
 <!DOCTYPE html>
 <style>
+  :root {
+    --overlay-bg: rgba(0, 0, 0, 0.9);
+    --container-bg: white;
+    --container-dark-bg: #1e1e1e;
+    --close-btn-bg: #f44336;
+    --close-btn-hover: #d32f2f;
+  }
+
   .mermaid-fullscreen-overlay {
     display: none;
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.9);
+    inset: 0;
+    background: var(--overlay-bg);
     z-index: 10000;
     cursor: pointer;
     animation: fadeIn 0.2s;
   }
-  
+
   .mermaid-fullscreen-container {
     position: absolute;
-    top: 2%;
-    left: 2%;
-    width: 96%;
-    height: 96%;
-    background: white;
+    inset: 2%;
+    background: var(--container-bg);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     cursor: default;
     overflow: auto;
-    box-sizing: border-box;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 40px;
   }
-  
+
   .mermaid-fullscreen-container.dark {
-    background: #1e1e1e;
+    background: var(--container-dark-bg);
   }
-  
+
   .mermaid-close-btn {
     position: absolute;
     top: 10px;
@@ -43,19 +43,20 @@
     width: 30px;
     height: 30px;
     border: none;
-    background: #f44336;
+    background: var(--close-btn-bg);
     color: white;
     border-radius: 50%;
     cursor: pointer;
     font-size: 18px;
     font-weight: bold;
-    z-index: 10001;
+    z-index: 1;
+    transition: background 0.2s;
   }
-  
+
   .mermaid-close-btn:hover {
-    background: #d32f2f;
+    background: var(--close-btn-hover);
   }
-  
+
   .mermaid-diagram-wrapper {
     width: 100%;
     height: 100%;
@@ -64,22 +65,22 @@
     justify-content: center;
     overflow: auto;
   }
-  
+
   .mermaid-diagram-wrapper svg {
-    max-width: none !important;
-    max-height: none !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
   }
-  
+
   .mermaid-clickable {
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
   }
-  
+
   .mermaid-clickable:hover {
     transform: scale(1.02);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
-  
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -87,187 +88,147 @@
 </style>
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-  
-  // Theme detection
-  var doc_theme = localStorage.getItem('rustdoc-theme');
-  var mermaidTheme = (doc_theme === 'dark' || doc_theme === 'ayu') ? 'dark' : 'default';
-  
-  // Initialize mermaid with startOnLoad disabled for manual control
+
+  // Helper: Get current theme
+  const getTheme = () => {
+    const theme = localStorage.getItem('rustdoc-theme');
+    return (theme === 'dark' || theme === 'ayu') ? 'dark' : 'default';
+  };
+
+  // Initialize mermaid
   mermaid.initialize({
     startOnLoad: false,
-    theme: mermaidTheme
+    theme: getTheme()
   });
-  
-  // Track processed diagrams to avoid duplicates
+
+  // Track processed diagrams
   const processedDiagrams = new WeakSet();
-  
-  // Function to process a single mermaid diagram
-  async function processMermaidDiagram(diagram) {
-    // Skip if already processed
-    if (processedDiagrams.has(diagram)) {
-      return;
+
+  // Helper: Close overlay with cleanup
+  const closeOverlay = (overlay, escHandler) => {
+    overlay?.remove();
+    if (escHandler) {
+      document.removeEventListener('keydown', escHandler);
     }
-    
-    // Mark as processed immediately to prevent race conditions
+  };
+
+  // Helper: Scale SVG to fit container
+  const scaleSVG = (svg) => {
+    if (!svg) return;
+
+    const viewBox = svg.getAttribute('viewBox') ||
+      `0 0 ${svg.getAttribute('width') || '800'} ${svg.getAttribute('height') || '600'}`;
+
+    svg.setAttribute('viewBox', viewBox);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    Object.assign(svg.style, {
+      width: '100%',
+      height: '100%',
+      maxWidth: '100%',
+      maxHeight: '100%'
+    });
+  };
+
+  // Helper: Render diagram in fullscreen
+  const renderFullscreen = async (mermaidText) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'mermaid-fullscreen-overlay';
+    overlay.style.display = 'block';
+
+    const container = document.createElement('div');
+    container.className = `mermaid-fullscreen-container${getTheme() === 'dark' ? ' dark' : ''}`;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'mermaid-close-btn';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.title = 'Close (ESC)';
+
+    const diagramWrapper = document.createElement('div');
+    diagramWrapper.className = 'mermaid-diagram-wrapper';
+
+    container.append(closeBtn, diagramWrapper);
+    overlay.appendChild(container);
+    document.body.appendChild(overlay);
+
+    // ESC key handler
+    const escHandler = (e) => {
+      if (e.key === 'Escape') closeOverlay(overlay, escHandler);
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // Close button and overlay click handlers
+    closeBtn.onclick = (e) => {
+      e.stopPropagation();
+      closeOverlay(overlay, escHandler);
+    };
+
+    overlay.onclick = (e) => {
+      if (e.target === overlay) closeOverlay(overlay, escHandler);
+    };
+
+    container.onclick = (e) => e.stopPropagation();
+
+    // Render the diagram
+    try {
+      const uniqueId = `mermaid-${Date.now()}`;
+      const { svg } = await mermaid.render(uniqueId, mermaidText);
+      diagramWrapper.innerHTML = svg;
+      scaleSVG(diagramWrapper.querySelector('svg'));
+    } catch (error) {
+      console.error('Failed to render mermaid diagram:', error);
+      diagramWrapper.innerHTML = '<p style="color: red;">Failed to render diagram</p>';
+    }
+  };
+
+  // Process a single mermaid diagram
+  const processMermaidDiagram = async (diagram) => {
+    if (processedDiagrams.has(diagram)) return;
+
     processedDiagrams.add(diagram);
-    
-    // Store original text content before mermaid processes it
     const originalText = diagram.textContent;
     diagram.setAttribute('data-mermaid-original', originalText);
-    
+
     try {
-      // Process this specific diagram
-      await mermaid.run({
-        nodes: [diagram]
-      });
-      
-      // Add fullscreen handler immediately after rendering
-      addFullscreenHandler(diagram);
+      await mermaid.run({ nodes: [diagram] });
+
+      // Add fullscreen click handler
+      diagram.classList.add('mermaid-clickable');
+      diagram.title = 'Click to view fullscreen';
+      diagram.onclick = () => {
+        const text = diagram.getAttribute('data-mermaid-original');
+        if (text) renderFullscreen(text);
+      };
     } catch (error) {
       console.error('Failed to render mermaid diagram:', error);
     }
-  }
-  
-  // Function to add fullscreen handler to a single diagram
-  function addFullscreenHandler(diagram) {
-    // Make diagram visually clickable
-    diagram.classList.add('mermaid-clickable');
-    diagram.title = 'Click to view fullscreen';
-    
-    diagram.addEventListener('click', async function() {
-      // Get the original mermaid syntax
-      const originalText = diagram.getAttribute('data-mermaid-original');
-      if (!originalText) {
-        console.error('Original mermaid syntax not found');
-        return;
-      }
-      
-      // Create overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'mermaid-fullscreen-overlay';
-      overlay.style.display = 'block';
-      
-      // Create container
-      const container = document.createElement('div');
-      container.className = 'mermaid-fullscreen-container';
-      if (doc_theme === 'dark' || doc_theme === 'ayu') {
-        container.classList.add('dark');
-      }
-      
-      // Create close button
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'mermaid-close-btn';
-      closeBtn.innerHTML = '&times;';
-      closeBtn.onclick = (e) => {
-        e.stopPropagation();
-        document.body.removeChild(overlay);
-      };
-      
-      // Create wrapper for the diagram
-      const diagramWrapper = document.createElement('div');
-      diagramWrapper.className = 'mermaid-diagram-wrapper';
-      
-      // Generate unique ID for this diagram
-      const uniqueId = 'mermaid-fullscreen-' + Date.now();
-      diagramWrapper.id = uniqueId;
-      
-      // Assemble popup
-      container.appendChild(closeBtn);
-      container.appendChild(diagramWrapper);
-      overlay.appendChild(container);
-      document.body.appendChild(overlay);
-      
-      // Render the diagram using mermaid's render API
-      try {
-        const { svg } = await mermaid.render(uniqueId + '-diagram', originalText);
-        diagramWrapper.innerHTML = svg;
-        
-        // Scale the SVG to fit the container
-        const svgElement = diagramWrapper.querySelector('svg');
-        if (svgElement) {
-          // Get original dimensions
-          const viewBox = svgElement.getAttribute('viewBox');
-          if (!viewBox) {
-            const width = svgElement.getAttribute('width') || '800';
-            const height = svgElement.getAttribute('height') || '600';
-            svgElement.setAttribute('viewBox', `0 0 ${width} ${height}`);
-          }
-          
-          // Set scaling attributes
-          svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-          svgElement.style.width = '100%';
-          svgElement.style.height = '100%';
-          svgElement.style.maxWidth = '100%';
-          svgElement.style.maxHeight = '100%';
-        }
-      } catch (error) {
-        console.error('Failed to render mermaid diagram:', error);
-        diagramWrapper.innerHTML = '<p style="color: red;">Failed to render diagram</p>';
-      }
-      
-      // Close on overlay click
-      overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) {
-          document.body.removeChild(overlay);
-        }
-      });
-      
-      // Close on ESC key
-      const escHandler = (e) => {
-        if (e.key === 'Escape') {
-          document.body.removeChild(overlay);
-          document.removeEventListener('keydown', escHandler);
-        }
-      };
-      document.addEventListener('keydown', escHandler);
-      
-      // Prevent diagram click from bubbling
-      container.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    });
-  }
-  
-  // Process any existing mermaid diagrams immediately
-  document.querySelectorAll('.mermaid').forEach(diagram => {
-    processMermaidDiagram(diagram);
-  });
-  
-  // Set up MutationObserver to process new mermaid diagrams as they appear
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      // Check added nodes
-      for (const node of mutation.addedNodes) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          // Check if the node itself is a mermaid diagram
-          if (node.classList && node.classList.contains('mermaid')) {
-            processMermaidDiagram(node);
-          }
-          // Check for mermaid diagrams within the added node
-          if (node.querySelectorAll) {
-            node.querySelectorAll('.mermaid').forEach(diagram => {
-              processMermaidDiagram(diagram);
-            });
-          }
-        }
-      }
-      
-      // Check for class changes on existing elements
-      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-        const target = mutation.target;
-        if (target.classList && target.classList.contains('mermaid')) {
-          processMermaidDiagram(target);
-        }
-      }
+  };
+
+  // Process all mermaid elements in a node
+  const processNode = (node) => {
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    if (node.classList?.contains('mermaid')) {
+      processMermaidDiagram(node);
     }
-  });
-  
-  // Start observing the document body for changes
-  observer.observe(document.body, {
+    node.querySelectorAll?.('.mermaid').forEach(processMermaidDiagram);
+  };
+
+  // Process existing diagrams
+  document.querySelectorAll('.mermaid').forEach(processMermaidDiagram);
+
+  // Observe for new diagrams
+  new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach(processNode);
+
+      if (mutation.type === 'attributes' && mutation.target.classList?.contains('mermaid')) {
+        processMermaidDiagram(mutation.target);
+      }
+    });
+  }).observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ['class']
   });
 </script>
-
