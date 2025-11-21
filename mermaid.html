@@ -101,8 +101,9 @@
     theme: getTheme()
   });
 
-  // Track processed diagrams
-  const processedDiagrams = new WeakSet();
+  // Track processed diagrams (Map for re-rendering on theme change)
+  const processedDiagrams = new Map();
+  let currentTheme = getTheme();
 
   // Helper: Close overlay with cleanup
   const closeOverlay = (overlay, escHandler) => {
@@ -180,26 +181,50 @@
     }
   };
 
-  // Process a single mermaid diagram
-  const processMermaidDiagram = async (diagram) => {
-    if (processedDiagrams.has(diagram)) return;
-
-    processedDiagrams.add(diagram);
-    const originalText = diagram.textContent;
-    diagram.setAttribute('data-mermaid-original', originalText);
-
+  // Re-render a diagram with stored text
+  const renderDiagram = async (diagram, mermaidText) => {
     try {
+      // Clear existing content
+      diagram.innerHTML = mermaidText;
+      diagram.removeAttribute('data-processed');
+
+      // Re-render with current theme
       await mermaid.run({ nodes: [diagram] });
 
       // Add fullscreen click handler
       diagram.classList.add('mermaid-clickable');
       diagram.title = 'Click to view fullscreen';
-      diagram.onclick = () => {
-        const text = diagram.getAttribute('data-mermaid-original');
-        if (text) renderFullscreen(text);
-      };
+      diagram.onclick = () => renderFullscreen(mermaidText);
     } catch (error) {
       console.error('Failed to render mermaid diagram:', error);
+    }
+  };
+
+  // Process a single mermaid diagram
+  const processMermaidDiagram = async (diagram) => {
+    if (processedDiagrams.has(diagram)) return;
+
+    const originalText = diagram.textContent;
+    processedDiagrams.set(diagram, originalText);
+    diagram.setAttribute('data-mermaid-original', originalText);
+
+    await renderDiagram(diagram, originalText);
+  };
+
+  // Update theme and re-render all diagrams
+  const updateTheme = async () => {
+    const newTheme = getTheme();
+    if (newTheme === currentTheme) return;
+
+    currentTheme = newTheme;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: newTheme
+    });
+
+    // Re-render all processed diagrams
+    for (const [diagram, originalText] of processedDiagrams.entries()) {
+      await renderDiagram(diagram, originalText);
     }
   };
 
@@ -231,4 +256,22 @@
     attributes: true,
     attributeFilter: ['class']
   });
+
+  // Watch for theme changes on the HTML element (catches DOM-based theme changes)
+  new MutationObserver(() => {
+    updateTheme();
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'data-theme']
+  });
+
+  // Listen for storage events (theme changes from other tabs)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'rustdoc-theme') {
+      updateTheme();
+    }
+  });
+
+  // Polling fallback for same-window localStorage changes (200ms interval)
+  setInterval(updateTheme, 200);
 </script>
