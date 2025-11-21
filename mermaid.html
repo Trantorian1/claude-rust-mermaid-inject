@@ -104,12 +104,16 @@
   // Track processed diagrams (Map for re-rendering on theme change)
   const processedDiagrams = new Map();
   let currentTheme = getTheme();
+  let activeOverlay = null;
 
   // Helper: Close overlay with cleanup
   const closeOverlay = (overlay, escHandler) => {
     overlay?.remove();
     if (escHandler) {
       document.removeEventListener('keydown', escHandler);
+    }
+    if (activeOverlay?.overlay === overlay) {
+      activeOverlay = null;
     }
   };
 
@@ -150,6 +154,9 @@
     container.append(closeBtn, diagramWrapper);
     overlay.appendChild(container);
     document.body.appendChild(overlay);
+
+    // Store reference to active overlay and its elements
+    activeOverlay = { overlay, container, diagramWrapper, mermaidText };
 
     // ESC key handler
     const escHandler = (e) => {
@@ -226,6 +233,28 @@
     for (const [diagram, originalText] of processedDiagrams.entries()) {
       await renderDiagram(diagram, originalText);
     }
+
+    // Update fullscreen overlay if active
+    if (activeOverlay) {
+      const { container, diagramWrapper, mermaidText } = activeOverlay;
+
+      // Update container theme class
+      if (newTheme === 'dark') {
+        container.classList.add('dark');
+      } else {
+        container.classList.remove('dark');
+      }
+
+      // Re-render the fullscreen diagram
+      try {
+        const uniqueId = `mermaid-fullscreen-${Date.now()}`;
+        const { svg } = await mermaid.render(uniqueId, mermaidText);
+        diagramWrapper.innerHTML = svg;
+        scaleSVG(diagramWrapper.querySelector('svg'));
+      } catch (error) {
+        console.error('Failed to re-render fullscreen diagram:', error);
+      }
+    }
   };
 
   // Process all mermaid elements in a node
@@ -257,21 +286,11 @@
     attributeFilter: ['class']
   });
 
-  // Watch for theme changes on the HTML element (catches DOM-based theme changes)
+  // Watch for theme changes on the HTML element
   new MutationObserver(() => {
     updateTheme();
   }).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class', 'data-theme']
   });
-
-  // Listen for storage events (theme changes from other tabs)
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'rustdoc-theme') {
-      updateTheme();
-    }
-  });
-
-  // Polling fallback for same-window localStorage changes (200ms interval)
-  setInterval(updateTheme, 200);
 </script>
