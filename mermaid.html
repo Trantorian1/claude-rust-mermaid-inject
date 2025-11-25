@@ -6,10 +6,8 @@
     --container-dark-bg: #1e1e1e;
     --close-btn-bg: #f44336;
     --close-btn-hover: #d32f2f;
-    --save-btn-bg: #2196F3;
-    --save-btn-hover: #1976D2;
-    --copy-btn-bg: #4CAF50;
-    --copy-btn-hover: #388E3C;
+    --action-btn-bg: #D2991D;
+    --action-btn-hover: #B8821A;
   }
 
   .mermaid-fullscreen-overlay {
@@ -77,20 +75,14 @@
     fill: white;
   }
 
-  .mermaid-copy-btn {
-    background: var(--copy-btn-bg);
-  }
-
-  .mermaid-copy-btn:hover {
-    background: var(--copy-btn-hover);
-  }
-
+  .mermaid-copy-btn,
   .mermaid-save-btn {
-    background: var(--save-btn-bg);
+    background: var(--action-btn-bg);
   }
 
+  .mermaid-copy-btn:hover,
   .mermaid-save-btn:hover {
-    background: var(--save-btn-hover);
+    background: var(--action-btn-hover);
   }
 
   .mermaid-close-btn {
@@ -128,9 +120,32 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   }
 
+  .mermaid-copy-feedback {
+    position: absolute;
+    top: 50px;
+    right: 10px;
+    background: var(--action-btn-bg);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 2;
+    opacity: 0;
+    animation: fadeInOut 2s ease-in-out;
+    pointer-events: none;
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-10px); }
+    15% { opacity: 1; transform: translateY(0); }
+    85% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-10px); }
   }
 </style>
 <script type="module">
@@ -229,9 +244,10 @@
   };
 
   // Helper: Copy mermaid source to clipboard
-  const copyMermaidSource = async (mermaidText) => {
+  const copyMermaidSource = async (mermaidText, container) => {
     try {
       await navigator.clipboard.writeText(mermaidText);
+      showCopyFeedback(container);
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
       // Fallback for older browsers
@@ -244,10 +260,24 @@
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
+        showCopyFeedback(container);
       } catch (fallbackError) {
         console.error('Fallback copy also failed:', fallbackError);
       }
     }
+  };
+
+  // Helper: Show copy success feedback
+  const showCopyFeedback = (container) => {
+    const feedback = document.createElement('div');
+    feedback.className = 'mermaid-copy-feedback';
+    feedback.textContent = 'Copied to clipboard!';
+    container.appendChild(feedback);
+
+    // Remove after animation completes
+    setTimeout(() => {
+      feedback.remove();
+    }, 2000);
   };
 
   // Helper: Render diagram in fullscreen
@@ -302,7 +332,7 @@
     // Button click handlers
     copyBtn.onclick = (e) => {
       e.stopPropagation();
-      copyMermaidSource(mermaidText);
+      copyMermaidSource(mermaidText, container);
     };
 
     saveBtn.onclick = (e) => {
