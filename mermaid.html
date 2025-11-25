@@ -43,7 +43,7 @@
     top: 10px;
     right: 10px;
     display: flex;
-    gap: 8px;
+    gap: 12px;
     z-index: 1;
   }
 
@@ -124,16 +124,23 @@
     position: absolute;
     top: 50px;
     right: 10px;
-    background: var(--action-btn-bg);
-    color: white;
+    background: var(--container-bg);
+    color: #333;
     padding: 8px 16px;
     border-radius: 4px;
     font-size: 14px;
     font-weight: 500;
     z-index: 2;
     opacity: 0;
-    animation: fadeInOut 2s ease-in-out;
+    animation: fadeInOut 1s ease-in-out;
     pointer-events: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .mermaid-copy-feedback.dark {
+    background: var(--container-dark-bg);
+    color: #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   }
 
   @keyframes fadeIn {
@@ -270,14 +277,14 @@
   // Helper: Show copy success feedback
   const showCopyFeedback = (container) => {
     const feedback = document.createElement('div');
-    feedback.className = 'mermaid-copy-feedback';
+    feedback.className = `mermaid-copy-feedback${getTheme() === 'dark' ? ' dark' : ''}`;
     feedback.textContent = 'Copied to clipboard!';
     container.appendChild(feedback);
 
     // Remove after animation completes
     setTimeout(() => {
       feedback.remove();
-    }, 2000);
+    }, 1000);
   };
 
   // Helper: Render diagram in fullscreen
