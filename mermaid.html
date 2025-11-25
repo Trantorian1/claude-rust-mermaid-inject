@@ -6,6 +6,10 @@
     --container-dark-bg: #1e1e1e;
     --close-btn-bg: #f44336;
     --close-btn-hover: #d32f2f;
+    --save-btn-bg: #2196F3;
+    --save-btn-hover: #1976D2;
+    --copy-btn-bg: #4CAF50;
+    --copy-btn-hover: #388E3C;
   }
 
   .mermaid-fullscreen-overlay {
@@ -36,21 +40,64 @@
     background: var(--container-dark-bg);
   }
 
-  .mermaid-close-btn {
+  .mermaid-button-group {
     position: absolute;
     top: 10px;
     right: 10px;
-    width: 30px;
-    height: 30px;
+    display: flex;
+    gap: 8px;
+    z-index: 1;
+  }
+
+  .mermaid-action-btn {
+    width: 32px;
+    height: 32px;
     border: none;
-    background: var(--close-btn-bg);
     color: white;
     border-radius: 50%;
     cursor: pointer;
-    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+    padding: 0;
+  }
+
+  .mermaid-action-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .mermaid-action-btn:active {
+    transform: scale(0.95);
+  }
+
+  .mermaid-action-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: white;
+  }
+
+  .mermaid-copy-btn {
+    background: var(--copy-btn-bg);
+  }
+
+  .mermaid-copy-btn:hover {
+    background: var(--copy-btn-hover);
+  }
+
+  .mermaid-save-btn {
+    background: var(--save-btn-bg);
+  }
+
+  .mermaid-save-btn:hover {
+    background: var(--save-btn-hover);
+  }
+
+  .mermaid-close-btn {
+    background: var(--close-btn-bg);
+    font-size: 20px;
     font-weight: bold;
-    z-index: 1;
-    transition: background 0.2s;
+    line-height: 1;
   }
 
   .mermaid-close-btn:hover {
@@ -147,6 +194,62 @@
     }
   };
 
+  // Helper: Save SVG diagram as file
+  const saveSVGDiagram = (diagramWrapper) => {
+    try {
+      const svg = diagramWrapper.querySelector('svg');
+      if (!svg) {
+        console.error('No SVG found to save');
+        return;
+      }
+
+      // Clone SVG to avoid modifying the displayed version
+      const svgClone = svg.cloneNode(true);
+
+      // Serialize SVG to string
+      const svgData = new XMLSerializer().serializeToString(svgClone);
+      const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `mermaid-diagram-${Date.now()}.svg`;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to save SVG diagram:', error);
+    }
+  };
+
+  // Helper: Copy mermaid source to clipboard
+  const copyMermaidSource = async (mermaidText) => {
+    try {
+      await navigator.clipboard.writeText(mermaidText);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = mermaidText;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      } catch (fallbackError) {
+        console.error('Fallback copy also failed:', fallbackError);
+      }
+    }
+  };
+
   // Helper: Render diagram in fullscreen
   const renderFullscreen = async (mermaidText) => {
     const overlay = document.createElement('div');
@@ -156,15 +259,34 @@
     const container = document.createElement('div');
     container.className = `mermaid-fullscreen-container${getTheme() === 'dark' ? ' dark' : ''}`;
 
+    // Create button group
+    const buttonGroup = document.createElement('div');
+    buttonGroup.className = 'mermaid-button-group';
+
+    // Copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'mermaid-action-btn mermaid-copy-btn';
+    copyBtn.title = 'Copy source code';
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>`;
+
+    // Save button
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'mermaid-action-btn mermaid-save-btn';
+    saveBtn.title = 'Save as SVG';
+    saveBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>`;
+
+    // Close button
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'mermaid-close-btn';
+    closeBtn.className = 'mermaid-action-btn mermaid-close-btn';
     closeBtn.innerHTML = '&times;';
     closeBtn.title = 'Close (ESC)';
+
+    buttonGroup.append(copyBtn, saveBtn, closeBtn);
 
     const diagramWrapper = document.createElement('div');
     diagramWrapper.className = 'mermaid-diagram-wrapper';
 
-    container.append(closeBtn, diagramWrapper);
+    container.append(buttonGroup, diagramWrapper);
     overlay.appendChild(container);
     document.body.appendChild(overlay);
 
@@ -177,7 +299,17 @@
     };
     document.addEventListener('keydown', escHandler);
 
-    // Close button and overlay click handlers
+    // Button click handlers
+    copyBtn.onclick = (e) => {
+      e.stopPropagation();
+      copyMermaidSource(mermaidText);
+    };
+
+    saveBtn.onclick = (e) => {
+      e.stopPropagation();
+      saveSVGDiagram(diagramWrapper);
+    };
+
     closeBtn.onclick = (e) => {
       e.stopPropagation();
       closeOverlay(overlay, escHandler);
