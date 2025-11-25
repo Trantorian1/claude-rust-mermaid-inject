@@ -105,18 +105,6 @@
     overflow: auto;
   }
 
-  .mermaid-diagram-wrapper pre {
-    margin: 0;
-    padding: 0;
-    background: none;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: auto;
-    height: auto;
-  }
-
   .mermaid-diagram-wrapper svg {
     max-width: 100% !important;
     max-height: 100% !important;
@@ -201,20 +189,8 @@
   // Helper: Scale SVG to fit container
   const scaleSVG = (svg) => {
     if (!svg) return;
-
-    const viewBox = svg.getAttribute('viewBox') ||
-      `0 0 ${svg.getAttribute('width') || '800'} ${svg.getAttribute('height') || '600'}`;
-
-    svg.setAttribute('viewBox', viewBox);
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    svg.removeAttribute('width');
-    svg.removeAttribute('height');
-    Object.assign(svg.style, {
-      display: 'block',
-      maxWidth: '100%',
-      maxHeight: '100%',
-      margin: 'auto'
-    });
+    svg.style.maxWidth = '100%';
+    svg.style.maxHeight = '100%';
   };
 
   // Helper: Render a mermaid diagram into a wrapper element
