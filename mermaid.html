@@ -195,11 +195,13 @@
 
     svg.setAttribute('viewBox', viewBox);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
     Object.assign(svg.style, {
-      width: 'auto',
-      height: 'auto',
+      display: 'block',
       maxWidth: '100%',
-      maxHeight: '100%'
+      maxHeight: '100%',
+      margin: 'auto'
     });
   };
 
